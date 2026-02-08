@@ -6,6 +6,7 @@
 typedef usize efi_status;
 typedef void* efi_handle;
 typedef void* efi_event;
+typedef u8 efi_boolean;
 
 // NOTE(vak): Calling convention
 
@@ -62,9 +63,26 @@ typedef struct efi_simple_text_output_protocol efi_simple_text_output_protocol;
 
 #define EFITextAttribute(Foreground,Background) ((Foreground) | ((Background) << 4))
 
+typedef efi_status EFI_API efi_text_reset(
+    efi_simple_text_output_protocol*    This,
+    efi_boolean                         ExtendedVerification
+);
+
 typedef efi_status EFI_API efi_text_string(
     efi_simple_text_output_protocol*    This,
     u16*                                String
+);
+
+typedef efi_status EFI_API efi_text_query_mode(
+    efi_simple_text_output_protocol*    This,
+    usize                               ModeNumber,
+    usize*                              Columns,
+    usize*                              Rows
+);
+
+typedef efi_status EFI_API efi_text_set_mode(
+    efi_simple_text_output_protocol*    This,
+    usize                               ModeNumber
 );
 
 typedef efi_status EFI_API efi_text_set_attribute(
@@ -78,11 +96,11 @@ typedef efi_status EFI_API efi_text_clear_screen(
 
 typedef struct efi_simple_text_output_protocol
 {
-     void*                   Reset;
+     efi_text_reset*         Reset;
      efi_text_string*        OutputString;
      void*                   TestString;
-     void*                   QueryMode;
-     void*                   SetMode;
+     efi_text_query_mode*    QueryMode;
+     efi_text_set_mode*      SetMode;
      efi_text_set_attribute* SetAttribute;
      efi_text_clear_screen*  ClearScreen;
      void*                   SetCursorPosition;

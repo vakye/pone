@@ -7,6 +7,44 @@
 #include "uefi_print.h"
 #include "uefi_print.c"
 
+typedef struct
+{
+    usize Size;
+    u8*   Descriptors;
+    usize Key;
+    usize DescriptorSize;
+    u32   DescriptorVersion;
+} uefi_memory_map;
+
+local uefi_memory_map UEFIObtainMemoryMap(efi_boot_services* BootServices)
+{
+    uefi_memory_map Result = {0};
+
+    BootServices->GetMemoryMap(
+        &Result.Size,
+        (efi_memory_descriptor*)Result.Descriptors,
+        &Result.Key,
+        &Result.DescriptorSize,
+        &Result.DescriptorVersion
+    );
+
+    BootServices->AllocatePool(
+        EfiLoaderData,
+        Result.Size,
+        &Result.Descriptors
+    );
+
+    BootServices->GetMemoryMap(
+        &Result.Size,
+        (efi_memory_descriptor*)Result.Descriptors,
+        &Result.Key,
+        &Result.DescriptorSize,
+        &Result.DescriptorVersion
+    );
+
+    return (Result);
+}
+
 efi_status EFI_API EntryUEFI(efi_handle ImageHandle, efi_system_table* SystemTable)
 {
     (void) ImageHandle;
@@ -20,106 +58,13 @@ efi_status EFI_API EntryUEFI(efi_handle ImageHandle, efi_system_table* SystemTab
     usize DefaultTextAttribute    = EFITextAttribute(EFI_LIGHTGRAY, EFI_BLACK);
     usize EmphasizedTextAttribute = EFITextAttribute(EFI_LIGHTRED,  EFI_BLACK);
 
-    // NOTE(vak): Clear screen
+    uefi_memory_map MemoryMap = UEFIObtainMemoryMap(BootServices);
+
+    // NOTE(vak): Setup ConOut
     {
         SetPrintColor(ConOut, DefaultTextAttribute);
         ClearScreen  (ConOut);
     }
-
-    // NOTE(vak): Obtain memory map
-    {
-        usize MemoryMapSize     = 0;
-        usize DescriptorSize    = sizeof(efi_memory_descriptor);
-        u32   DescriptorVersion = 0;
-
-        BootServices->GetMemoryMap(
-            &MemoryMapSize,
-            0,
-            0,
-            &DescriptorSize,
-            &DescriptorVersion
-        );
-
-        u8* MemoryDescriptors = 0;
-
-        BootServices->AllocatePool(
-            EfiLoaderData,
-            MemoryMapSize,
-            &MemoryDescriptors
-        );
-
-        usize MemoryMapKey = 0;
-
-        BootServices->GetMemoryMap(
-            &MemoryMapSize,
-            (efi_memory_descriptor*)MemoryDescriptors,
-            &MemoryMapKey,
-            &DescriptorSize,
-            &DescriptorVersion
-        );
-
-        usize DescriptorCount = MemoryMapSize / DescriptorSize;
-
-        persist string MemoryTypeNames[EfiMaxMemoryType] =
-        {
-            [EfiReservedMemoryType]      = StaticStr("ReservedMemory"),
-            [EfiLoaderCode]              = StaticStr("LoaderCode"),
-            [EfiLoaderData]              = StaticStr("LoaderData"),
-            [EfiBootServicesCode]        = StaticStr("BootServicesCode"),
-            [EfiBootServicesData]        = StaticStr("BootServicesData"),
-            [EfiRuntimeServicesCode]     = StaticStr("RuntimeServicesCode"),
-            [EfiRuntimeServicesData]     = StaticStr("RuntimeServicesData"),
-            [EfiConventionalMemory]      = StaticStr("ConventionalMemory"),
-            [EfiUnusableMemory]          = StaticStr("UnusableMemory"),
-            [EfiACPIReclaimMemory]       = StaticStr("ACPIReclaimMemory"),
-            [EfiACPIMemoryNVS]           = StaticStr("ACPIMemoryNVS"),
-            [EfiMemoryMappedIO]          = StaticStr("MemoryMappedIO"),
-            [EfiMemoryMappedIOPortSpace] = StaticStr("MemoryMappedIOPortSpace"),
-            [EfiPalCode]                 = StaticStr("PalCode"),
-            [EfiPersistentMemory]        = StaticStr("PersistentMemory"),
-            [EfiUnacceptedMemoryType]    = StaticStr("UnacceptedMemory"),
-        };
-
-        Print       (ConOut, Str("Memory map: "));
-        PrintNewLine(ConOut);
-
-        usize IndexPadding =
-            (DescriptorCount >=     0) +
-            (DescriptorCount >=    10) +
-            (DescriptorCount >=   100) +
-            (DescriptorCount >=  1000) +
-            (DescriptorCount >= 10000)
-        ;
-
-        for (usize Index = 0; Index < DescriptorCount; Index++)
-        {
-            efi_memory_descriptor* Descriptor = (efi_memory_descriptor*)
-                (MemoryDescriptors + Index*DescriptorSize);
-
-            if (Descriptor->Type == EfiConventionalMemory)
-            {
-                PrintSpaces (ConOut, 4);
-                Print       (ConOut, Str("["));
-                PrintUSize  (ConOut, Index, PrintBase_Dec);
-
-                Print       (ConOut, Str("]: Type="));
-                Print       (ConOut, MemoryTypeNames[Descriptor->Type]);
-
-                Print       (ConOut, Str(", Physical="));
-                PrintUSize  (ConOut, Descriptor->PhysicalStart, PrintBase_Hex);
-
-                Print       (ConOut, Str(", Virtual="));
-                PrintUSize  (ConOut, Descriptor->VirtualStart, PrintBase_Hex);
-
-                Print       (ConOut, Str(", PageCount="));
-                PrintUSize  (ConOut, Descriptor->NumberOfPages, PrintBase_Dec);
-
-                PrintNewLine(ConOut);
-            }
-        }
-    }
-
-    PrintNewLine (ConOut);
 
     // NOTE(vak): "Hello, world!"
     {
@@ -128,6 +73,54 @@ efi_status EFI_API EntryUEFI(efi_handle ImageHandle, efi_system_table* SystemTab
     }
 
     PrintNewLine (ConOut);
+
+    // NOTE(vak): Detected conventional memory size
+    {
+        usize ConventionalMemorySize = 0;
+
+        usize DescriptorCount = MemoryMap.Size / MemoryMap.DescriptorSize;
+
+        for (usize Index = 0; Index < DescriptorCount; Index++)
+        {
+            efi_memory_descriptor* Descriptor = (efi_memory_descriptor*)
+                (MemoryMap.Descriptors + Index * MemoryMap.DescriptorSize);
+
+            if (Descriptor->Type == EfiConventionalMemory)
+                ConventionalMemorySize += Descriptor->NumberOfPages * 4096;
+        }
+
+        Print(ConOut, Str("Detected conventional memory size: "));
+
+        usize  Integer = 0;
+        usize  Decimal = 0;
+        usize  Shift   = 0;
+
+        if (0) {}
+        else if (ConventionalMemorySize >= TB(1)) Shift = 40;
+        else if (ConventionalMemorySize >= GB(1)) Shift = 30;
+        else if (ConventionalMemorySize >= MB(1)) Shift = 20;
+        else if (ConventionalMemorySize >= KB(1)) Shift = 10;
+
+        Integer = ConventionalMemorySize >> Shift;
+        Decimal = (10*ConventionalMemorySize >> Shift) - 10*Integer;
+
+        PrintUSize(ConOut, Integer, PrintBase_Dec);
+        Print     (ConOut, Str("."));
+        PrintUSize(ConOut, Decimal, PrintBase_Dec);
+
+        switch (Shift)
+        {
+            case 1:  break;
+            case 10: Print(ConOut, Str("KB")); break;
+            case 20: Print(ConOut, Str("MB")); break;
+            case 30: Print(ConOut, Str("GB")); break;
+            case 40: Print(ConOut, Str("TB")); break;
+        }
+
+        PrintNewLine(ConOut);
+    }
+
+    PrintNewLine(ConOut);
 
     // NOTE(vak): PrintUSize test
     {
