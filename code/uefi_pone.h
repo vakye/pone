@@ -159,6 +159,23 @@ typedef struct
 
 typedef struct
 {
+    u32     Type;
+    usize   PhysicalAddress;
+    usize   VirtualAddress;
+    u64     NumberOfPages;
+    u64     Attribute;
+} efi_memory_descriptor;
+
+typedef efi_status EFI_API efi_get_memory_map(
+    usize*                 MemoryMapSize,
+    efi_memory_descriptor* MemoryDescriptors,
+    usize*                 MapKey,
+    usize*                 DescriptorSize,
+    u32*                   DescriptorVersion
+);
+
+typedef struct
+{
     efi_table_header                    Header;
 
     // NOTE(vak): Task priority
@@ -170,7 +187,7 @@ typedef struct
 
     void*                               AllocateMemory;
     void*                               FreePages;
-    void*                               GetMemoryMap;
+    efi_get_memory_map*                 GetMemoryMap;
     void*                               AllocatePool;
     void*                               FreePool;
 
