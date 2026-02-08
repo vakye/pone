@@ -21,6 +21,8 @@ local usize Print(
 {
     // TODO(vak): Convert UTF8 to UTF16
 
+    usize Result = 0;
+
     persist u16 Buffer[4096] = {0};
 
     while (String.Size)
@@ -29,7 +31,7 @@ local usize Print(
 
         for (usize Index = 0; Index < Count; Index++)
         {
-            Buffer[Index] = String.Data[Index];
+            Buffer[Index] = (u16)String.Data[Index];
         }
 
         Buffer[Count] = '\0';
@@ -38,9 +40,10 @@ local usize Print(
 
         String.Data += Count;
         String.Size -= Count;
+
+        Result += Count;
     }
 
-    usize Result = String.Size;
     return (Result);
 }
 
@@ -75,6 +78,20 @@ local usize PrintSpaces(
     return (Result);
 }
 
+local usize PrintPadding(
+    efi_simple_text_output_protocol*    ConOut,
+    usize                               Printed,
+    usize                               Padding
+)
+{
+    usize Result = 0;
+
+    if (Padding > Printed)
+        Result = PrintSpaces(ConOut, Padding - Printed);
+
+    return (Result);
+}
+
 // NOTE(vak): Integer printing
 
 local usize PrintUSize(
@@ -83,19 +100,23 @@ local usize PrintUSize(
     print_base                          Base
 )
 {
-    if (Base == 0) return (0);
+    if (Base <= 1) return (0);
     if (Base > 16) return (0);
 
-    char Buffer[64] = {0};
+    persist char Buffer[64] = {0};
+
     usize DigitCount = 0;
     usize DigitIndex = ArrayCount(Buffer);
 
-    persist char DigitCharacters[] = "0123456789abcdef";
+    persist char DigitCharacters[16 + 1] = "0123456789abcdef";
 
     do
     {
         char Digit = (char)(Number % Base);
         Number /= Base;
+
+        if (DigitCount == ArrayCount(Buffer))
+            break;
 
         DigitCount++;
         DigitIndex--;
@@ -104,6 +125,7 @@ local usize PrintUSize(
     } while(Number);
 
     usize Result = Print(ConOut, StrData(Buffer + DigitIndex, DigitCount));
+
     return (Result);
 }
 

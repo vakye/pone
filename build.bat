@@ -8,5 +8,5 @@ set LinkFlags=/incremental:no /opt:icf /opt:ref /nodefaultlib /subsystem:efi_app
 
 pushd build
 call cl %CompileFlags% /Fe:BOOTX64.efi "..\code\uefi_pone.c" /link %LinkFlags% %UEFILinkFlags%
-call ..\tools\write_gpt -i pone.img
+call ..\tools\write_gpt -ds 4 -i pone.img
 popd

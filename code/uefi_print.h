@@ -34,6 +34,12 @@ local usize PrintSpaces(
     usize                               SpaceCount
 );
 
+local usize PrintPadding(
+    efi_simple_text_output_protocol*    ConOut,
+    usize                               Printed,
+    usize                               Padding
+);
+
 // NOTE(vak): Integer printing
 
 typedef enum

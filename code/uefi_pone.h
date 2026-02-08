@@ -9,7 +9,7 @@ typedef void* efi_event;
 
 // NOTE(vak): Calling convention
 
-#define EFI_API
+#define EFI_API __cdecl
 
 // NOTE(vak): EFI status codes
 
@@ -105,10 +105,9 @@ typedef struct
 
 typedef enum
 {
-    EFI_ResetType_Cold,
-    EFI_ResetType_Warm,
-    EFI_ResetType_Shutdown,
-    EFI_ResetType_PlatformSpecific,
+    EfiResetCold,
+    EfiResetWarm,
+    EfiResetShutdown,
 } efi_reset_type;
 
 typedef void EFI_API efi_reset_system(
@@ -157,11 +156,38 @@ typedef struct
 
 // NOTE(vak): Boot services
 
+typedef enum
+{
+    EfiReservedMemoryType,
+    EfiLoaderCode,
+    EfiLoaderData,
+    EfiBootServicesCode,
+    EfiBootServicesData,
+    EfiRuntimeServicesCode,
+    EfiRuntimeServicesData,
+    EfiConventionalMemory,
+    EfiUnusableMemory,
+    EfiACPIReclaimMemory,
+    EfiACPIMemoryNVS,
+    EfiMemoryMappedIO,
+    EfiMemoryMappedIOPortSpace,
+    EfiPalCode,
+    EfiPersistentMemory,
+    EfiUnacceptedMemoryType,
+    EfiMaxMemoryType,
+} efi_memory_type;
+
+typedef efi_status EFI_API efi_allocate_pool(
+    efi_memory_type MemoryType,
+    usize           Size,
+    void**          Result
+);
+
 typedef struct
 {
     u32     Type;
-    usize   PhysicalAddress;
-    usize   VirtualAddress;
+    usize   PhysicalStart;
+    usize   VirtualStart;
     u64     NumberOfPages;
     u64     Attribute;
 } efi_memory_descriptor;
@@ -188,7 +214,7 @@ typedef struct
     void*                               AllocateMemory;
     void*                               FreePages;
     efi_get_memory_map*                 GetMemoryMap;
-    void*                               AllocatePool;
+    efi_allocate_pool*                  AllocatePool;
     void*                               FreePool;
 
     // NOTE(vak): Event & Timer services
