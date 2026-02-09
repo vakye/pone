@@ -13,9 +13,9 @@ local void EFIRestorePrintBuffer(
     ConOut->SetAttribute(ConOut, EFITextAttribute(EFI_LIGHTGRAY, EFI_BLACK));
     ConOut->ClearScreen (ConOut);
 
-    if (OutputBufferWrite <= OutputBufferSize)
+    if (OutputBufferWrite == OutputBufferSize)
     {
-        for (usize Index = 0; Index < OutputBufferSize; Index++)
+        for (usize Index = 0; Index < OutputBufferWrite; Index++)
         {
             u16 String[] = {OutputBuffer[Index], 0};
 
@@ -23,16 +23,16 @@ local void EFIRestorePrintBuffer(
             ConOut->OutputString(ConOut, String);
         }
     }
-    else
+    else if (OutputBufferSize < OutputBufferSize)
     {
         usize Before = OutputBufferSize - OutputBufferWrite;
         usize After  = OutputBufferWrite;
 
         for (usize Index = 0; Index < Before; Index++)
         {
-            u16 String[] = {OutputBuffer[OutputBufferWrite + Index], 0};
+            u16 String[] = {OutputBuffer[After + Index], 0};
 
-            ConOut->SetAttribute(ConOut, AttributeBuffer[OutputBufferWrite + Index]);
+            ConOut->SetAttribute(ConOut, AttributeBuffer[After + Index]);
             ConOut->OutputString(ConOut, String);
         }
 
@@ -84,6 +84,7 @@ local usize EFIPrintfV(
             char Character = (u16)String.Data[Index];
 
             Buffer16[Index] = (u16)Character;
+
             OutputBuffer[OutputBufferWrite] = Character;
             AttributeBuffer[OutputBufferWrite] = CurrentAttribute;
 
@@ -119,6 +120,30 @@ local usize EFIPrintf(
     return (Result);
 }
 
+local usize EFIInfof(
+    efi_simple_text_output_protocol*    ConOut,
+    string                              Format,
+    ...
+)
+{
+    usize Result = 0;
+
+    Result += EFIPrintf(ConOut, Str("["));
+
+    EFISetPrintColor(ConOut, EFITextAttribute(EFI_LIGHTCYAN, EFI_BLACK));
+    Result += EFIPrintf(ConOut, Str("INFO "));
+    EFISetPrintColor(ConOut, EFITextAttribute(EFI_LIGHTGRAY, EFI_BLACK));
+
+    Result += EFIPrintf(ConOut, Str("]: "));
+
+    va_list ArgList;
+    va_start(ArgList, Format);
+    Result += EFIPrintfV(ConOut, Format, ArgList);
+    va_end(ArgList);
+
+    return (Result);
+}
+
 local usize EFIDebugf(
     efi_simple_text_output_protocol*    ConOut,
     string                              Format,
@@ -127,6 +152,7 @@ local usize EFIDebugf(
 {
     usize Result = 0;
 
+#if 0
     Result += EFIPrintf(ConOut, Str("["));
 
     EFISetPrintColor(ConOut, EFITextAttribute(EFI_LIGHTGREEN, EFI_BLACK));
@@ -139,6 +165,7 @@ local usize EFIDebugf(
     va_start(ArgList, Format);
     Result += EFIPrintfV(ConOut, Format, ArgList);
     va_end(ArgList);
+#endif
 
     return (Result);
 }

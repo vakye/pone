@@ -16,14 +16,33 @@ typedef struct
     u32 Data1;
     u16 Data2;
     u16 Data3;
-    u8  Data4[8];
+
+    union
+    {
+        u8  Data4[8];
+        u64 Data4_64;
+    };
 } efi_guid;
+
+// NOTE(vak): Macro for comparing EFI GUID
+
+#define EFISameGUID(A, B) \
+    (((A).Data1    == (B).Data1   ) && \
+     ((A).Data2    == (B).Data2   ) && \
+     ((A).Data3    == (B).Data3   ) && \
+     ((A).Data4_64 == (B).Data4_64))
 
 // NOTE(vak): GUID for protcols
 
 #define EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID \
     {0x9042a9de,0x23dc,0x4a38,\
     {0x96,0xfb,0x7a,0xde,0xd0,0x80,0x51,0x6a}}
+
+// NOTE(vak): GUID for configuration tables
+
+#define EFI_ACPI_TABLE_GUID \
+    {0x8868e871,0xe4f1,0x11d3,\
+    {0xbc,0x22,0x00,0x80,0xc7,0x3c,0x88,0x81}}
 
 // NOTE(vak): Calling convention
 
@@ -385,6 +404,12 @@ typedef struct
 
 typedef struct
 {
+    efi_guid VendorGUID;
+    void*    VendorTable;
+} efi_configuration_table;
+
+typedef struct
+{
     efi_table_header                    Header;
     u16*                                FirmwareVendor;
     u32                                 FirmwareRevision;
@@ -397,7 +422,7 @@ typedef struct
     efi_runtime_services*               RuntimeServices;
     efi_boot_services*                  BootServices;
     usize                               NumberOfTableEntries;
-    void*                               ConfigurationTable;
+    efi_configuration_table*            ConfigurationTables;
 } efi_system_table;
 
 // NOTE(vak): Graphics output protocol

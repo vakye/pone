@@ -28,6 +28,12 @@ local usize EFIPrintf(
     ...
 );
 
+local usize EFIInfof(
+    efi_simple_text_output_protocol*    ConOut,
+    string                              Format,
+    ...
+);
+
 local usize EFIDebugf(
     efi_simple_text_output_protocol*    ConOut,
     string                              Format,

@@ -6,7 +6,9 @@ local uefi_memory_map EFIObtainMemoryMap(
 {
     uefi_memory_map Result = {0};
 
-    for (;;)
+    b32 Good = false;
+
+    while (!Good)
     {
         efi_status Status = BootServices->GetMemoryMap(
             &Result.Size,
@@ -20,7 +22,7 @@ local uefi_memory_map EFIObtainMemoryMap(
 
         if (Status == EFI_SUCCESS)
         {
-            EFIDebugf(Debug, Str("Successfully obtained memory map.\r\n"));
+            Good = true;
             break;
         }
         else if (Status == EFI_BUFFER_TOO_SMALL)
@@ -46,6 +48,11 @@ local uefi_memory_map EFIObtainMemoryMap(
             EFIErrorf(Debug, Str("Unknown error reported from GetMemoryMap().\r\n"));
             break;
         }
+    }
+
+    if (!Good)
+    {
+        Result = (uefi_memory_map){0};
     }
 
     return (Result);
