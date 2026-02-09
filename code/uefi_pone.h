@@ -14,8 +14,45 @@ typedef u8 efi_boolean;
 
 // NOTE(vak): EFI status codes
 
-#define EFI_SUCCESS                 (0)
-#define EFI_NOT_READY               (6)
+enum
+{
+    EFI_SUCCESS,
+    EFI_LOAD_ERROR,
+    EFI_INVALID_PARAMETER,
+    EFI_UNSUPPORTED,
+    EFI_BAD_BUFFER_SIZE,
+    EFI_BUFFER_TOO_SMALL,
+    EFI_NOT_READY,
+    EFI_DEVICE_ERROR,
+    EFI_WRITE_PROTECTED,
+    EFI_OUT_OF_RESOURCES,
+    EFI_VOLUME_CORRUPTED,
+    EFI_VOLUME_FULL,
+    EFI_NO_MEDIA,
+    EFI_MEDIA_CHANGED,
+    EFI_NOT_FOUND,
+    EFI_ACCESS_DENIED,
+    EFI_NO_RESPONSE,
+    EFI_NO_MAPPING,
+    EFI_TIMEOUT,
+    EFI_NOT_STARTED,
+    EFI_ALREADY_STARTED,
+    EFI_ABORTED,
+    EFI_ICMP_ERROR,
+    EFI_TFTP_ERROR,
+    EFI_PROTOCOL_ERROR,
+    EFI_INCOMPATIBLE_VERSION,
+    EFI_SECURITY_VIOLATION,
+    EFI_CRC_ERROR,
+    EFI_END_OF_MEDIA,
+    EFI_END_OF_FILE,
+    EFI_INVALID_LANGUAGE,
+    EFI_COMPROMISED_DATA,
+    EFI_IP_ADDRESS_CONFLICT,
+    EFI_HTTP_ERROR,
+};
+
+#define EFIStatusUnsetHighBit(Status) ((Status) & ~(1ull << 63))
 
 // NOTE(vak): Simple text input protocol
 
@@ -201,6 +238,10 @@ typedef efi_status EFI_API efi_allocate_pool(
     void**          Result
 );
 
+typedef efi_status EFI_API efi_free_pool(
+    void*           Buffer
+);
+
 typedef struct
 {
     u32     Type;
@@ -209,6 +250,23 @@ typedef struct
     u64     NumberOfPages;
     u64     Attribute;
 } efi_memory_descriptor;
+
+#define EFI_MEMORY_UC              0x0000000000000001
+#define EFI_MEMORY_WC              0x0000000000000002
+#define EFI_MEMORY_WT              0x0000000000000004
+#define EFI_MEMORY_WB              0x0000000000000008
+#define EFI_MEMORY_UCE             0x0000000000000010
+#define EFI_MEMORY_WP              0x0000000000001000
+#define EFI_MEMORY_RP              0x0000000000002000
+#define EFI_MEMORY_XP              0x0000000000004000
+#define EFI_MEMORY_NV              0x0000000000008000
+#define EFI_MEMORY_MORE_RELIABLE   0x0000000000010000
+#define EFI_MEMORY_RO              0x0000000000020000
+#define EFI_MEMORY_SP              0x0000000000040000
+#define EFI_MEMORY_CPU_CRYPTO      0x0000000000080000
+#define EFI_MEMORY_RUNTIME         0x8000000000000000
+#define EFI_MEMORY_ISA_VALID       0x4000000000000000
+#define EFI_MEMORY_ISA_MASK        0x0FFFF00000000000
 
 typedef efi_status EFI_API efi_get_memory_map(
     usize*                 MemoryMapSize,
@@ -229,11 +287,11 @@ typedef struct
 
     // NOTE(vak): Memory services
 
-    void*                               AllocateMemory;
+    void*                               AllocatePages;
     void*                               FreePages;
     efi_get_memory_map*                 GetMemoryMap;
     efi_allocate_pool*                  AllocatePool;
-    void*                               FreePool;
+    efi_free_pool*                      FreePool;
 
     // NOTE(vak): Event & Timer services
 

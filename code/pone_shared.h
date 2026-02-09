@@ -6,6 +6,8 @@
 #define local static
 #define persist static
 
+#define fallthrough
+
 // NOTE(vak): Macros
 
 #define CTAssert(Expression) _Static_assert(Expression, "Compile-time assertion failed")
@@ -67,17 +69,3 @@ typedef u64 b64;
 
 #define true  (1)
 #define false (0)
-
-// NOTE(vak): String
-
-typedef struct
-{
-    char* Data;
-    usize Size;
-} string;
-
-#define StrData(Data, Size)         (string){Data, Size}
-#define Str(Literal)                (string){Literal, sizeof(Literal) - 1}
-
-#define StaticStrData(Data, Size)   {Data, Size}
-#define StaticStr(Literal)          {Literal, sizeof(Literal) - 1}

@@ -1,63 +1,35 @@
 
 #pragma once
 
-// NOTE(vak): Attributes
-
-local void SetPrintColor(
+local void EFISetPrintColor(
     efi_simple_text_output_protocol*    ConOut,
     usize                               Attribute
 );
 
-// NOTE(vak): Clear
-
-local void ClearScreen(efi_simple_text_output_protocol* ConOut);
-
-// NOTE(vak): Print
-
-local usize Print(
-    efi_simple_text_output_protocol*    ConOut,
-    string                              String
-);
-
-local usize PrintNewLine(
+local void EFIClearScreen(
     efi_simple_text_output_protocol*    ConOut
 );
 
-local usize PrintRepeat(
+local usize EFIPrintfV(
     efi_simple_text_output_protocol*    ConOut,
-    string                              String,
-    usize                               Count
+    string                              Format,
+    va_list                             ArgList
 );
 
-local usize PrintSpaces(
+local usize EFIPrintf(
     efi_simple_text_output_protocol*    ConOut,
-    usize                               SpaceCount
+    string                              Format,
+    ...
 );
 
-local usize PrintPadding(
+local usize EFIDebugf(
     efi_simple_text_output_protocol*    ConOut,
-    usize                               Printed,
-    usize                               Padding
+    string                              Format,
+    ...
 );
 
-// NOTE(vak): Integer printing
-
-typedef enum
-{
-    PrintBase_Bin = 2,
-    PrintBase_Oct = 8,
-    PrintBase_Dec = 10,
-    PrintBase_Hex = 16,
-} print_base;
-
-local usize PrintUSize(
+local usize EFIErrorf(
     efi_simple_text_output_protocol*    ConOut,
-    usize                               Number,
-    print_base                          Base
-);
-
-local usize PrintSSize(
-    efi_simple_text_output_protocol*    ConOut,
-    ssize                               Number,
-    print_base                          Base
+    string                              Format,
+    ...
 );
