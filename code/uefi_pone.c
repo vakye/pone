@@ -10,83 +10,11 @@
 #include "uefi_print.h"
 #include "uefi_print.c"
 
-typedef struct
-{
-    usize Size;
-    u8*   Descriptors;
-    usize Key;
-    usize DescriptorSize;
-    u32   DescriptorVersion;
-} uefi_memory_map;
-
-local uefi_memory_map UEFIObtainMemoryMap(
-    efi_simple_text_output_protocol* ConOut,
-    efi_boot_services* BootServices
-)
-{
-    uefi_memory_map Result = {0};
-
-    for (;;)
-    {
-        efi_status Status = BootServices->GetMemoryMap(
-            &Result.Size,
-            (efi_memory_descriptor*)Result.Descriptors,
-            &Result.Key,
-            &Result.DescriptorSize,
-            &Result.DescriptorVersion
-        );
-
-        Status = EFIStatusUnsetHighBit(Status);
-
-        if (Status == EFI_SUCCESS)
-        {
-            EFIDebugf(ConOut, Str("Successfully obtained memory map.\r\n"));
-            break;
-        }
-        else if (Status == EFI_BUFFER_TOO_SMALL)
-        {
-            EFIDebugf(ConOut, Str("Memory map buffer is too small. Reallocating to a larger size...\r\n"));
-
-            usize NewSize = Result.Size + 4 * Result.DescriptorSize;
-
-            if (Result.Descriptors)
-            {
-                BootServices->FreePool(Result.Descriptors);
-            }
-
-            efi_status PoolStatus = BootServices->AllocatePool(
-                EfiLoaderData,
-                NewSize,
-                &Result.Descriptors
-            );
-
-            PoolStatus = EFIStatusUnsetHighBit(PoolStatus);
-
-            if (PoolStatus != EFI_SUCCESS)
-            {
-                EFIErrorf(ConOut, Str("Failed to allocate memory map buffer due to insufficient pool memory.\r\n"));
-                break;
-            }
-        }
-        else if (Status == EFI_INVALID_PARAMETER)
-        {
-            EFIErrorf(ConOut, Str("Invalid parameter passed to GetMemoryMap().\r\n"));
-            break;
-        }
-        else
-        {
-            EFIErrorf(ConOut, Str("Unknown error reported from GetMemoryMap().\r\n"));
-            break;
-        }
-    }
-
-    return (Result);
-}
+#include "uefi_memory.h"
+#include "uefi_memory.c"
 
 efi_status EFI_API EntryUEFI(efi_handle ImageHandle, efi_system_table* SystemTable)
 {
-    (void) ImageHandle;
-
     efi_simple_text_input_protocol*  ConIn  = SystemTable->ConIn;
     efi_simple_text_output_protocol* ConOut = SystemTable->ConOut;
 
@@ -98,6 +26,14 @@ efi_status EFI_API EntryUEFI(efi_handle ImageHandle, efi_system_table* SystemTab
 
     // NOTE(vak): Setup ConOut
     {
+        usize Columns = 0;
+        usize Rows = 0;
+
+        if (ConOut->QueryMode(ConOut, 1, &Columns, &Rows) == EFI_SUCCESS)
+        {
+            ConOut->SetMode(ConOut, 1);
+        }
+
         EFISetPrintColor(ConOut, DefaultTextAttribute);
         EFIClearScreen(ConOut);
     }
@@ -107,9 +43,138 @@ efi_status EFI_API EntryUEFI(efi_handle ImageHandle, efi_system_table* SystemTab
         EFIDebugf(ConOut, Str("Hello, world!\r\n"));
     }
 
-    // NOTE(vak): Obtain the memory map from boot services
+    // NOTE(vak): Locate graphics output protocol
 
-    uefi_memory_map MemoryMap = UEFIObtainMemoryMap(ConOut, BootServices);
+    efi_graphics_output_protocol* GOP = 0;
+
+    {
+        efi_guid GUID = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+
+        efi_status LocateStatus = BootServices->LocateProtocol(
+            &GUID,
+            0,
+            &GOP
+        );
+
+        LocateStatus = EFIStatusUnsetHighBit(LocateStatus);
+
+        if (LocateStatus == EFI_SUCCESS)
+        {
+            EFIDebugf(ConOut, Str("Successfully located Graphics Output Protocol.\r\n"));
+        }
+        else if (LocateStatus == EFI_INVALID_PARAMETER)
+        {
+            EFIErrorf(ConOut, Str("Invalid parameter passed to LocateProtocol().\r\n"));
+        }
+        else if (LocateStatus == EFI_NOT_FOUND)
+        {
+            EFIErrorf(ConOut, Str("Graphics Output Protocol is not available.\r\n"));
+        }
+    }
+
+    // NOTE(vak): Find a suitable video mode and set it as the
+    // current video mode
+
+    if (GOP)
+    {
+        u32 MaxMode = GOP->Mode->MaxMode;
+
+        usize InfoSize = sizeof(efi_graphics_output_mode_information);
+
+        efi_graphics_output_mode_information* Info = EFIAllocatePool(
+            ConOut,
+            BootServices,
+            InfoSize
+        );
+
+        u32 DesiredSizeX = 1920;
+        u32 DesiredSizeY = 1200;
+
+        EFIDebugf(ConOut, Str("Video mode count: %u32\r\n"), MaxMode + 1);
+        EFIDebugf(ConOut, Str("Desired video mode:\r\n"));
+        EFIDebugf(ConOut, Str("    + SizeX:        %u32\r\n"), DesiredSizeX);
+        EFIDebugf(ConOut, Str("    + SizeY:        %u32\r\n"), DesiredSizeY);
+        EFIDebugf(ConOut, Str("    + Pixel format: RGBA8 or BGRA8\r\n"));
+
+        u32 ChosenMode = MaxMode + 1;
+
+        for (u32 Mode = 0; Mode <= MaxMode; Mode++)
+        {
+            efi_status QueryStatus = GOP->QueryMode(
+                GOP,
+                Mode,
+                &InfoSize,
+                &Info
+            );
+
+            if (QueryStatus == EFI_DEVICE_ERROR)
+            {
+                EFIErrorf(ConOut, Str("Device error ocurred when trying to query video mode (%u32).\r\n"), Mode);
+                continue;
+            }
+            else if (QueryStatus == EFI_INVALID_PARAMETER)
+            {
+                EFIErrorf(ConOut, Str("Video mode number (%u32) is not valid.\r\n"), Mode);
+                continue;
+            }
+
+            if ((Info->HorzResolution != DesiredSizeX) || (Info->VertResolution != DesiredSizeY))
+            {
+                continue;
+            }
+
+            if (
+                (Info->PixelFormat != PixelRedGreenBlueReserved8BitPerColor) &&
+                (Info->PixelFormat != PixelBlueGreenRedReserved8BitPerColor)
+            )
+            {
+                continue;
+            }
+
+            EFIDebugf(ConOut, Str("Found desired video mode: (%u32)\r\n"), Mode);
+            ChosenMode = Mode;
+            break;
+        }
+
+        if (ChosenMode <= MaxMode)
+        {
+            string PixelFormat =
+                (Info->PixelFormat == PixelRedGreenBlueReserved8BitPerColor) ?
+                Str("RGBA8") :
+                Str("BGRA8");
+
+            EFIDebugf(ConOut, Str("Switching to video mode (%u32):\r\n"), ChosenMode);
+            EFIDebugf(ConOut, Str("    + SizeX:        %u32\r\n"), Info->HorzResolution);
+            EFIDebugf(ConOut, Str("    + SizeY:        %u32\r\n"), Info->VertResolution);
+            EFIDebugf(ConOut, Str("    + Pixel format: %str\r\n"), PixelFormat);
+
+            efi_status SetStatus = GOP->SetMode(
+                GOP,
+                ChosenMode
+            );
+
+            SetStatus = EFIStatusUnsetHighBit(SetStatus);
+
+            if (SetStatus == EFI_DEVICE_ERROR)
+            {
+                EFIErrorf(ConOut, Str("Device error occured when trying to set video mode (%u32)\r\n"), ChosenMode);
+            }
+            else if (SetStatus == EFI_UNSUPPORTED)
+            {
+                 EFIErrorf(ConOut, Str("Video mode (%u32) is unsupported by device\r\n"), ChosenMode);
+            }
+
+            EFIRestorePrintBuffer(ConOut);
+        }
+        else
+        {
+            EFIErrorf(ConOut, Str("Failed to find the desired video mode.\r\n"));
+        }
+    }
+
+    // NOTE(vak): Obtain memory map
+
+    uefi_memory_map MemoryMap = EFIObtainMemoryMap(ConOut, BootServices);
     usize DescriptorCount = MemoryMap.Size / MemoryMap.DescriptorSize;
 
     // NOTE(vak): Memory map info

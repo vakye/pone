@@ -8,6 +8,23 @@ typedef void* efi_handle;
 typedef void* efi_event;
 typedef u8 efi_boolean;
 
+typedef usize efi_physical_address;
+typedef usize efi_virtual_address;
+
+typedef struct
+{
+    u32 Data1;
+    u16 Data2;
+    u16 Data3;
+    u8  Data4[8];
+} efi_guid;
+
+// NOTE(vak): GUID for protcols
+
+#define EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID \
+    {0x9042a9de,0x23dc,0x4a38,\
+    {0x96,0xfb,0x7a,0xde,0xd0,0x80,0x51,0x6a}}
+
 // NOTE(vak): Calling convention
 
 #define EFI_API __cdecl
@@ -244,11 +261,11 @@ typedef efi_status EFI_API efi_free_pool(
 
 typedef struct
 {
-    u32     Type;
-    usize   PhysicalStart;
-    usize   VirtualStart;
-    u64     NumberOfPages;
-    u64     Attribute;
+    u32                     Type;
+    efi_physical_address    PhysicalStart;
+    efi_virtual_address     VirtualStart;
+    u64                     NumberOfPages;
+    u64                     Attribute;
 } efi_memory_descriptor;
 
 #define EFI_MEMORY_UC              0x0000000000000001
@@ -269,11 +286,17 @@ typedef struct
 #define EFI_MEMORY_ISA_MASK        0x0FFFF00000000000
 
 typedef efi_status EFI_API efi_get_memory_map(
-    usize*                 MemoryMapSize,
-    efi_memory_descriptor* MemoryDescriptors,
-    usize*                 MapKey,
-    usize*                 DescriptorSize,
-    u32*                   DescriptorVersion
+    usize*                  MemoryMapSize,
+    efi_memory_descriptor*  MemoryDescriptors,
+    usize*                  MapKey,
+    usize*                  DescriptorSize,
+    u32*                    DescriptorVersion
+);
+
+typedef efi_status EFI_API efi_locate_protocol(
+    efi_guid*               Protocol,
+    void*                   Registration,
+    void**                  Interface
 );
 
 typedef struct
@@ -343,7 +366,7 @@ typedef struct
 
     void*                               ProtocolsPerHandle;
     void*                               LocateHandleBuffer;
-    void*                               LocateProtocol;
+    efi_locate_protocol*                LocateProtocol;
     void*                               InstallMultipleProtocolInterfaces;
     void*                               UninstallMultipleProtocolInterfaces;
 
@@ -376,3 +399,94 @@ typedef struct
     usize                               NumberOfTableEntries;
     void*                               ConfigurationTable;
 } efi_system_table;
+
+// NOTE(vak): Graphics output protocol
+
+typedef struct efi_graphics_output_protocol efi_graphics_output_protocol;
+
+typedef enum
+{
+    PixelRedGreenBlueReserved8BitPerColor,
+    PixelBlueGreenRedReserved8BitPerColor,
+    PixelBitMask,
+    PixelBltOnly,
+    PixelFormatMax
+} efi_graphics_pixel_format;
+
+typedef struct
+{
+    u32 RedMask;
+    u32 GreenMask;
+    u32 BlueMask;
+    u32 ReservedMask;
+} efi_pixel_bitmask;
+
+typedef struct
+{
+    u32                         Version;
+    u32                         HorzResolution;
+    u32                         VertResolution;
+    efi_graphics_pixel_format   PixelFormat;
+    efi_pixel_bitmask           PixelInformation;
+    u32                         PixelsPerScanline;
+} efi_graphics_output_mode_information;
+
+typedef struct
+{
+    u32                                     MaxMode;
+    u32                                     Mode;
+    efi_graphics_output_mode_information*   Info;
+    usize                                   SizeOfInfo;
+    efi_physical_address                    FramebufferBase;
+    usize                                   FramebufferSize;
+} efi_graphics_output_protocol_mode;
+
+typedef efi_status EFI_API efi_graphics_output_protocol_query_mode(
+    efi_graphics_output_protocol*           This,
+    u32                                     ModeNumber,
+    usize*                                  SizeOfInfo,
+    efi_graphics_output_mode_information**  Info
+);
+
+typedef efi_status EFI_API efi_graphics_output_protocol_set_mode(
+    efi_graphics_output_protocol*           This,
+    u32                                     ModeNumber
+);
+
+typedef struct
+{
+    u8 Blue;
+    u8 Green;
+    u8 Red;
+    u8 Reserved;
+} efi_graphics_output_blt_pixel;
+
+typedef enum
+{
+    EfiBltVideoFill,
+    EfiBltVideoToBltBuffer,
+    EfiBltBufferToVideo,
+    EfiBltVideoToVideo,
+    EfiGraphicsOutputBltOperationMax
+} efi_graphics_output_blt_operation;
+
+typedef efi_status EFI_API efi_graphics_output_protocol_blt(
+    efi_graphics_output_protocol*           This,
+    efi_graphics_output_blt_pixel*          BltBuffer,
+    efi_graphics_output_blt_operation       BltOperation,
+    usize                                   SourceX,
+    usize                                   SourceY,
+    usize                                   DestinationX,
+    usize                                   DestinationY,
+    usize                                   Width,
+    usize                                   Height,
+    usize                                   Delta
+);
+
+typedef struct efi_graphics_output_protocol
+{
+    efi_graphics_output_protocol_query_mode*    QueryMode;
+    efi_graphics_output_protocol_set_mode*      SetMode;
+    efi_graphics_output_protocol_blt*           Blt;
+    efi_graphics_output_protocol_mode*          Mode;
+} efi_graphics_output_protocol;

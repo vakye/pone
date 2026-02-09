@@ -1,6 +1,12 @@
 
 #pragma once
 
+// NOTE(vak): Used when switching video modes.
+// WARN(vak): Extremely slow!
+local void EFIRestorePrintBuffer(
+    efi_simple_text_output_protocol*    ConOut
+);
+
 local void EFISetPrintColor(
     efi_simple_text_output_protocol*    ConOut,
     usize                               Attribute
