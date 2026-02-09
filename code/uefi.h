@@ -32,12 +32,6 @@ typedef struct
      ((A).Data3    == (B).Data3   ) && \
      ((A).Data4_64 == (B).Data4_64))
 
-// NOTE(vak): GUID for protcols
-
-#define EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID \
-    {0x9042a9de,0x23dc,0x4a38,\
-    {0x96,0xfb,0x7a,0xde,0xd0,0x80,0x51,0x6a}}
-
 // NOTE(vak): GUID for configuration tables
 
 #define EFI_ACPI_TABLE_GUID \
@@ -50,67 +44,40 @@ typedef struct
 
 // NOTE(vak): EFI status codes
 
-enum
-{
-    EFI_SUCCESS,
-    EFI_LOAD_ERROR,
-    EFI_INVALID_PARAMETER,
-    EFI_UNSUPPORTED,
-    EFI_BAD_BUFFER_SIZE,
-    EFI_BUFFER_TOO_SMALL,
-    EFI_NOT_READY,
-    EFI_DEVICE_ERROR,
-    EFI_WRITE_PROTECTED,
-    EFI_OUT_OF_RESOURCES,
-    EFI_VOLUME_CORRUPTED,
-    EFI_VOLUME_FULL,
-    EFI_NO_MEDIA,
-    EFI_MEDIA_CHANGED,
-    EFI_NOT_FOUND,
-    EFI_ACCESS_DENIED,
-    EFI_NO_RESPONSE,
-    EFI_NO_MAPPING,
-    EFI_TIMEOUT,
-    EFI_NOT_STARTED,
-    EFI_ALREADY_STARTED,
-    EFI_ABORTED,
-    EFI_ICMP_ERROR,
-    EFI_TFTP_ERROR,
-    EFI_PROTOCOL_ERROR,
-    EFI_INCOMPATIBLE_VERSION,
-    EFI_SECURITY_VIOLATION,
-    EFI_CRC_ERROR,
-    EFI_END_OF_MEDIA,
-    EFI_END_OF_FILE,
-    EFI_INVALID_LANGUAGE,
-    EFI_COMPROMISED_DATA,
-    EFI_IP_ADDRESS_CONFLICT,
-    EFI_HTTP_ERROR,
-};
-
-#define EFIStatusUnsetHighBit(Status) ((Status) & ~(1ull << 63))
-
-// NOTE(vak): Simple text input protocol
-
-typedef struct efi_simple_text_input_protocol efi_simple_text_input_protocol;
-
-typedef struct
-{
-    u16 ScanCode;
-    s16 UnicodeChar;
-} efi_input_key;
-
-typedef efi_status EFI_API efi_input_read_key(
-    efi_simple_text_input_protocol* This,
-    efi_input_key*                  Key
-);
-
-typedef struct efi_simple_text_input_protocol
-{
-    void*                   Reset;
-    efi_input_read_key*     ReadKeyStroke;
-    efi_event               WaitForKey;
-} efi_simple_text_input_protocol;
+#define EFI_SUCCESS              (0)
+#define EFI_LOAD_ERROR           ((1ull << 63) | 1)
+#define EFI_INVALID_PARAMETER    ((1ull << 63) | 2)
+#define EFI_UNSUPPORTED          ((1ull << 63) | 3)
+#define EFI_BAD_BUFFER_SIZE      ((1ull << 63) | 4)
+#define EFI_BUFFER_TOO_SMALL     ((1ull << 63) | 5)
+#define EFI_NOT_READY            ((1ull << 63) | 6)
+#define EFI_DEVICE_ERROR         ((1ull << 63) | 7)
+#define EFI_WRITE_PROTECTED      ((1ull << 63) | 8)
+#define EFI_OUT_OF_RESOURCES     ((1ull << 63) | 9)
+#define EFI_VOLUME_CORRUPTED     ((1ull << 63) | 10)
+#define EFI_VOLUME_FULL          ((1ull << 63) | 11)
+#define EFI_NO_MEDIA             ((1ull << 63) | 12)
+#define EFI_MEDIA_CHANGED        ((1ull << 63) | 13)
+#define EFI_NOT_FOUND            ((1ull << 63) | 14)
+#define EFI_ACCESS_DENIED        ((1ull << 63) | 15)
+#define EFI_NO_RESPONSE          ((1ull << 63) | 16)
+#define EFI_NO_MAPPING           ((1ull << 63) | 17)
+#define EFI_TIMEOUT              ((1ull << 63) | 18)
+#define EFI_NOT_STARTED          ((1ull << 63) | 19)
+#define EFI_ALREADY_STARTED      ((1ull << 63) | 20)
+#define EFI_ABORTED              ((1ull << 63) | 21)
+#define EFI_ICMP_ERROR           ((1ull << 63) | 22)
+#define EFI_TFTP_ERROR           ((1ull << 63) | 23)
+#define EFI_PROTOCOL_ERROR       ((1ull << 63) | 24)
+#define EFI_INCOMPATIBLE_VERSION ((1ull << 63) | 25)
+#define EFI_SECURITY_VIOLATION   ((1ull << 63) | 26)
+#define EFI_CRC_ERROR            ((1ull << 63) | 27)
+#define EFI_END_OF_MEDIA         ((1ull << 63) | 28)
+#define EFI_END_OF_FILE          ((1ull << 63) | 29)
+#define EFI_INVALID_LANGUAGE     ((1ull << 63) | 30)
+#define EFI_COMPROMISED_DATA     ((1ull << 63) | 31)
+#define EFI_IP_ADDRESS_CONFLICT  ((1ull << 63) | 32)
+#define EFI_HTTP_ERROR           ((1ull << 63) | 33)
 
 // NOTE(vak): Simple text output protocol
 
@@ -318,6 +285,11 @@ typedef efi_status EFI_API efi_locate_protocol(
     void**                  Interface
 );
 
+typedef efi_status EFI_API efi_exit_boot_services(
+    efi_handle              ImageHandle,
+    usize                   MapKey
+);
+
 typedef struct
 {
     efi_table_header                    Header;
@@ -362,7 +334,7 @@ typedef struct
     void*                               StartImage;
     void*                               Exit;
     void*                               UnloadImage;
-    void*                               ExitBootServices;
+    efi_exit_boot_services*             ExitBootServices;
 
     // NOTE(vak): Miscellaneous services
 
@@ -414,7 +386,7 @@ typedef struct
     u16*                                FirmwareVendor;
     u32                                 FirmwareRevision;
     efi_handle                          ConsoleInHandle;
-    efi_simple_text_input_protocol*     ConIn;
+    void*                               ConIn;
     efi_handle                          ConsoleOutHandle;
     efi_simple_text_output_protocol*    ConOut;
     efi_handle                          StandardErrorHandle;

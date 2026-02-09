@@ -3,10 +3,10 @@
 
 if not exist build mkdir build
 
-set CompileFlags=%CompileFlags% /nologo /Zi /FC /std:c11 /GS- /Gs999999 /Od /Oi /W4 /WX /wd4101 /wd4189 /wd4100
-set LinkFlags=/incremental:no /opt:icf /opt:ref /nodefaultlib /subsystem:efi_application /entry:UEFIBoot
+set CompileFlags=-target x86_64-unknown-windows -O0 -ffreestanding -mno-red-zone -nostdlib
+set LinkFlags=-Wl,-entry:UEFIBoot,-subsystem:efi_application
 
 pushd build
-call cl %CompileFlags% /Fe:BOOTX64.efi "..\code\uefi.c" /link %LinkFlags% %UEFILinkFlags%
+call clang %CompileFlags% "..\code\uefi.c" -o BOOTX64.efi %LinkFlags%
 call ..\tools\write_gpt -ds 29 -i pone.img
 popd
